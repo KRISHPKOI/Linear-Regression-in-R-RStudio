@@ -1,0 +1,259 @@
+---
+title: "Linear Regression in R"
+author: "Krishna P Koirala"
+date: "5/26/2018"
+output:
+  md_document:
+    variant: markdown_github
+    fig_width: 7
+    fig_height: 6
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## What is linear model?
+
+To run linear regression in R we use the function lm():
+The first argument of lm() has the form "response ~ term". 
+This is what we call formula. 
+
+The first element of the formula is the response (dependent variable), and it should have numeric values (continuous variable). 
+As we want to use this model to measure the relationship between G3 and other variables.
+
+The second element, after the "~", is called term (independent variable) corresponding to the independent variable. 
+It is a series of terms specifying a linear predictor for response. In this case, we use all other columns. 
+
+What does the linear model do? 
+
+It will try to find a line that best fits the data, according to:
+Y=aX+b
+Where Y is the response, X is the term, a is coefficient that defines the slope and b is the intercept with the Y axis.
+
+
+
+```{r}
+df <- read.csv("Student-mat.csv", sep = ';')
+```
+
+
+```{r}
+head(df)
+```
+
+```{r}
+summary(df)
+```
+
+```{r}
+str(df)
+```
+
+
+```{r}
+# Check if we have any NAs on the df
+any(is.na(df))
+```
+
+```{r}
+library(ggplot2)
+library(ggthemes)
+library(dplyr)
+#library(corrgram)
+library(corrplot)
+```
+
+```{r}
+# Lets see only the numeric columns
+num.cols <- sapply(df, is.numeric)
+```
+
+
+```{r}
+# Lets see the correlation between numeric columns
+cor.data <- cor(df[, num.cols])
+```
+
+```{r}
+cor.data
+```
+
+
+```{r}
+corrplot(cor.data, method = 'color')
+```
+
+```{r}
+library(GGally)
+#ggcorr(cor.data, label = TRUE)
+ggcorr(cor.data)
+```
+
+
+```{r}
+ggplot(df, aes(x = G3)) + geom_histogram(bins = 20, alpha = 0.5, fill = 'blue')
+```
+
+## Traing Test split. Using caTools library, this can also be
+done by using caret package.
+
+```{r}
+length(df)
+```
+
+
+
+```{r}
+library(caTools)
+set.seed(101)
+sample <- sample.split(df$G3, SplitRatio = 0.7) # G3 is the variable we want to predice
+train <- subset(df, sample == TRUE) # 70% is training
+test <- subset(df, sample == FALSE) # 30% is test set
+```
+
+
+
+```{r}
+model <- lm(G3 ~., data = train)
+```
+
+
+```{r}
+summary(model)
+```
+
+
+## Interpreting the model: 
+
+Take a closer look at "Residuals", in the output above. 
+Residual is the difference between the actual data value and the value predicted by the linear model. 
+It is calculated for every data sample - in our case, 277 obs(the training set) observarions. 
+As it wouldn't be convenient to visualize 277 residuals, what you see above is a summary 
+containing the Min, 1Q, Median, 3Q and Max values. 
+
+Now look at the residual standard error: it's a measure of the model’s accuracy. 
+In our model, the error is 1.962 on 235 degrees of freedom, which is a very good result. 
+“Degrees of freedom” are defined as the difference between the number of observations 
+in the sample and the number of variables in the model (277 obs. minus 33 variables). But this is not true in this model, 
+I don't know how to explain this.
+
+We also have the "Multiple R-squared”. This is a statistical measure of how closely the regression line fits the data.
+Numerically, it’s the percentage of the response (dependent) variable’s variation that is explained by the independent variables.
+Generally, good models have high values. However, a high R-squared value alone cannot justify the model. 
+
+The last item in the output is the p-value, which tests the fit of the null hypothesis to our data. 
+The null hypothesis assumes that there is no relationship between the independent and dependent variables in the model. 
+The p-value represents the probability you will obtain a result equal to or more extreme than 
+what was actually observed, if the null hypothesis is true. Generally, if the p-value is very low (below 0.05), 
+it meets threshold to reject the null hypothesis. 
+
+Here, the p-value is less than 0.05. We conclude that there is a significant relationship between G3 and Other variables. 
+
+
+
+```{r}
+plot(model$residual)
+```
+
+
+```{r}
+library(ggplot2)
+ggplot(aes(model$residual), data = model) + geom_histogram(bins = 20, fill = 'red')
+```
+
+
+```{r}
+plot(model)
+```
+
+## Prediction
+
+
+```{r}
+G3.predictions <- predict(model, test)
+```
+
+
+```{r}
+plot(G3.predictions) # This is the value of G3 predicted by our model
+```
+
+## Comparing predicted and actual values
+
+```{r}
+result <- cbind(G3.predictions, test$G3)
+```
+
+```{r}
+colnames(result) <- c('predicted', 'actual')
+```
+
+
+```{r}
+result <- as.data.frame(result)
+print(head(result))
+```
+
+```{r}
+min(result)
+```
+
+It means our model predicted test data wrongly. 
+It should not predict -ve value because 
+our test data dose not have -ve value, 
+the minimum is only zero. 
+So our model should predict until zero not less than that.
+
+
+## Taking care of negative prediction of our model
+
+```{r}
+to_zero <- function(x){
+    if (x < 0) {
+        return(0)
+    }else{
+        return(x)
+    }
+}
+```
+
+```{r}
+# apply zero function
+result$predicted <- sapply(result$predicted, to_zero)
+```
+
+## Lets evaluate prediction value using mean squared error
+
+
+```{r}
+mse <- mean((result$actual - result$predicted)^2)
+print(mse)
+```
+
+```{r}
+# We can also use roor mean squared error
+rmse <- sqrt(mean((result$actual - result$predicted)^2))
+rmse
+```
+
+## Calculated R-Squared value
+
+```{r}
+# SSE = (sum of squared errors) 
+SSE <- sum((result$predicted - result$actual)^2)
+```
+
+
+```{r}
+#SST = (sum of squared total)
+SST = sum((mean(df$G3) - result$actual)^2)
+```
+
+
+```{r}
+R2 <- 1 - SSE/SST
+R2
+```
+
+R2 looks not so bad its cool
