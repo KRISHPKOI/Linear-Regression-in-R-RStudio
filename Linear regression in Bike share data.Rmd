@@ -1,0 +1,141 @@
+---
+title: "Linear regression Bike sharing"
+author: "Krishna P Koirala"
+date: "5/29/2018"
+output:
+  md_document:
+    variant: markdown_github
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+bike <- read.csv("bikeshare.csv")
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r}
+head(bike)
+```
+
+# Targed variable is count
+
+# EDA
+
+```{r}
+library(ggplot2)
+ggplot(aes(temp, count), data = bike) + geom_point(alpha = .3, aes(color = temp)) + theme_bw()
+```
+
+# Convert to time stamp
+
+
+```{r}
+bike$datetime <- as.POSIXct(bike$datetime)
+class(bike$datetime)
+```
+
+
+```{r}
+p1 <- ggplot(aes(datetime, count), data = bike) + geom_point(aes(color = temp), alpha = 0.5)
+p1
+```
+
+
+```{r}
+p1 + scale_color_continuous(low = '#55D8CE', high = '#FF6E2E') + theme_bw()
+```
+
+```{r}
+cor(bike$temp, bike$count)
+```
+
+```{r}
+ggplot(aes(factor(season), count), data = bike) + geom_boxplot(aes(color = factor(season))) + theme_dark()
+```
+
+
+# Feature Engineering, creating hour column
+
+
+```{r}
+bike$hour <- sapply(bike$datetime, function(x){format(x, "%H")})
+head(bike)
+```
+
+# Scatterplot
+
+```{r}
+library(dplyr)
+# filter()= subset(), filter() only works with dplyr library 
+p2 <- ggplot(aes(hour, count), data = filter(bike, workingday == 1)) + geom_point(aes(color = temp), alpha = .3, position = position_jitter(w= .4, h = 0)) + theme_bw()
+p2
+```
+
+
+```{r}
+p2 <- p2 + scale_color_gradientn(colours = c('dark blue', 'blue', 'light blue', 'light green', 'yellow', 'orange', 'red'))
+p2
+```
+
+
+```{r}
+p3 <- ggplot(aes(hour, count), data = filter(bike, workingday == 0)) + geom_point(aes(color = temp), alpha = .2, position = position_jitter(w= .4, h = 0)) + theme_bw()
+p3
+```
+
+
+```{r}
+p3 <- p3 + scale_color_gradientn(colours = c('dark blue', 'blue', 'light blue', 'light green', 'yellow', 'orange', 'red'))
+p3
+```
+
+
+# Model Building
+
+This is time series data thats why cannot use all variables to predict
+count column. Just using temp column
+
+```{r}
+temp.model <- lm(count ~ temp, bike)
+```
+
+```{r}
+summary(temp.model)
+```
+
+# How many bike rental counts at 25 c?
+
+```{r}
+# One way of answering above question
+mx_plus_c <- 9.1705*25 + 6.0462
+mx_plus_c
+```
+
+```{r}
+# The othe way
+temp.test <- data.frame(temp = c(25))
+predict(temp.model, temp.test)
+```
+
+# changing hour column to numeric
+
+```{r}
+bike$hour <- sapply(bike$hour, as.numeric)
+```
+
+# Another model
+
+```{r}
+# creating model except some columns
+model <- lm(count ~ . -casual - registered - datetime - atemp, bike )
+summary(model)
+```
+
+This model woul not be so good to predict time series analysis.
+
